@@ -17,6 +17,8 @@
 package org.vertx.mods;
 
 import com.mongodb.*;
+import com.mongodb.util.JSON;
+
 import org.vertx.java.busmods.BusModBase;
 import org.vertx.java.core.Handler;
 import org.vertx.java.core.eventbus.Message;
@@ -175,6 +177,9 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
           break;
         case "command":
           runCommand(message);
+          break;
+        case "distinct":
+          doDistinct(message);
           break;
         default:
           sendError(message, "Invalid action: " + action);
@@ -453,6 +458,29 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     }
     JsonObject reply = new JsonObject();
     reply.putNumber("count", count);
+    sendOK(message, reply);
+  }
+
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  private void doDistinct(Message<JsonObject> message) {
+    String collection = getMandatoryString("collection", message);
+    if (collection == null) {
+      return;
+    }
+    String key = getMandatoryString("key", message);
+    if (key == null) {
+      return;
+    }
+    JsonObject matcher = message.body().getObject("matcher");
+    DBCollection coll = db.getCollection(collection);
+	List values;
+    if (matcher == null) {
+      values = coll.distinct(key);
+    } else {
+      values = coll.distinct(key, jsonToDBObject(matcher));
+    }
+    JsonObject reply = new JsonObject();
+    reply.putArray("values", new JsonArray(values));
     sendOK(message, reply);
   }
 
