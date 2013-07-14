@@ -181,6 +181,9 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
         case "distinct":
           doDistinct(message);
           break;
+        case "insert":
+          doInsert(message);
+          break;
         default:
           sendError(message, "Invalid action: " + action);
       }
@@ -198,13 +201,7 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     if (doc == null) {
       return;
     }
-    String genID;
-    if (doc.getField("_id") == null) {
-      genID = UUID.randomUUID().toString();
-      doc.putString("_id", genID);
-    } else {
-      genID = null;
-    }
+    String genID = generateId(doc);
     DBCollection coll = db.getCollection(collection);
     DBObject obj = jsonToDBObject(doc);
     WriteConcern writeConcern = WriteConcern.valueOf(getOptionalStringConfig("writeConcern", ""));
@@ -228,6 +225,62 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     } else {
       sendError(message, res.getError());
     }
+  }
+
+  private void doInsert(Message<JsonObject> message) {
+    String collection = getMandatoryString("collection", message);
+    if (collection == null) {
+      return;
+    }
+    boolean multipleDocuments = message.body().getBoolean("multiple", false);
+
+    List<DBObject> dbos = new ArrayList<>();
+    String genID = null;
+    if (multipleDocuments) {
+      JsonArray documents = message.body().getArray("documents");
+      if (documents == null) {
+        return;
+      }
+      for (Object o : documents) {
+        JsonObject doc = (JsonObject) o;
+        generateId(doc);
+        dbos.add(jsonToDBObject(doc));
+      }
+    } else {
+      JsonObject doc = getMandatoryObject("document", message);
+      if (doc == null) {
+        return;
+      }
+      genID = generateId(doc);
+      dbos.add(jsonToDBObject(doc));
+    }
+
+    DBCollection coll = db.getCollection(collection);
+    WriteConcern writeConcern = WriteConcern.valueOf(getOptionalStringConfig("write_concern",""));
+    if (writeConcern == null) {
+      writeConcern = db.getWriteConcern();
+    }
+    writeConcern = WriteConcern.SAFE;
+    WriteResult res = coll.insert(dbos, writeConcern);
+    if (res.getError() == null) {
+      JsonObject reply = new JsonObject();
+      reply.putNumber("number", res.getN());
+      if (genID != null) {
+        reply.putString("_id", genID);
+      }
+      sendOK(message, reply);
+    } else {
+      sendError(message, res.getError());
+    }
+  }
+
+  private String generateId(JsonObject doc) {
+    if (doc.getField("_id") == null) {
+      String genID = UUID.randomUUID().toString();
+      doc.putString("_id", genID);
+      return genID;
+    }
+    return null;
   }
 
   private void doUpdate(Message<JsonObject> message) {
