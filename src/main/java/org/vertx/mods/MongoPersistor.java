@@ -463,7 +463,17 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
       res = keys != null ? coll.findOne(jsonToDBObject(matcher), jsonToDBObject(keys)) : coll.findOne(jsonToDBObject(matcher));
     }
     JsonObject reply = new JsonObject();
-    if (res != null) {
+	JsonArray fetch = message.body().getArray("fetch");
+	if (res != null) {
+		if (fetch != null) {
+			for (Object attr : fetch) {
+				if (!(attr instanceof String)) continue;
+				String f = (String) attr;
+				Object tmp = res.get(f);
+				if (tmp == null || !(tmp instanceof DBRef)) continue;
+				res.put(f, ((DBRef) tmp).fetch());
+			}
+		}
       JsonObject m = new JsonObject(res.toMap());
       reply.putObject("result", m);
     }
