@@ -400,44 +400,15 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
   }
 
   private void sendBatch(Message<JsonObject> message, final DBCursor cursor, final int max, final int timeout) {
-    int count = 0;
     JsonArray results = new JsonArray();
-    while (cursor.hasNext() && count < max) {
+    while (cursor.hasNext()) {
       DBObject obj = cursor.next();
       JsonObject m = dbObjectToJsonObject(obj);
       results.add(m);
-      count++;
     }
-    if (cursor.hasNext()) {
-      JsonObject reply = createBatchMessage("more-exist", results);
-
-      // If the user doesn't reply within timeout, close the cursor
-      final long timerID = vertx.setTimer(timeout, new Handler<Long>() {
-        @Override
-        public void handle(Long timerID) {
-          container.logger().warn("Closing DB cursor on timeout");
-          try {
-            cursor.close();
-          } catch (Exception ignore) {
-          }
-        }
-      });
-
-
-      message.reply(reply, new Handler<Message<JsonObject>>() {
-        @Override
-        public void handle(Message<JsonObject> msg) {
-          vertx.cancelTimer(timerID);
-          // Get the next batch
-          sendBatch(msg, cursor, max, timeout);
-        }
-      });
-
-    } else {
-      JsonObject reply = createBatchMessage("ok", results);
-      message.reply(reply);
-      cursor.close();
-    }
+    JsonObject reply = createBatchMessage("ok", results);
+    message.reply(reply);
+    cursor.close();
   }
 
   private JsonObject createBatchMessage(String status, JsonArray results) {
