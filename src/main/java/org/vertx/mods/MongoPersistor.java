@@ -144,6 +144,9 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
         case "update":
           doUpdate(message);
           break;
+        case "bulk":
+          doBulk(message);
+          break;
         case "find":
           doFind(message);
           break;
@@ -319,6 +322,76 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     } else {
       sendError(message, res.getError());
     }
+  }
+
+  private void doBulk(Message<JsonObject> message) {
+    String collection = getMandatoryString("collection", message);
+    if (collection == null) {
+      return;
+    }
+    JsonArray commands = message.body().getArray("commands");
+    if (commands == null || commands.size() < 1) {
+      sendError(message, "Missing commands");
+      return;
+    }
+    final String writeConcern  = message.body().getString("write_concern");
+    DBCollection coll = db.getCollection(collection);
+    BulkWriteOperation bulk = coll.initializeUnorderedBulkOperation();
+    for (Object o: commands) {
+      if (!(o instanceof JsonObject)) continue;
+      JsonObject command = (JsonObject) o;
+      JsonObject d = command.getObject("document");
+      JsonObject c = command.getObject("criteria");
+      switch (command.getString("operation", "")) {
+        case "insert" :
+          if (d != null) {
+            bulk.insert(jsonToDBObject(d));
+          }
+          break;
+        case "update" :
+          if (d != null && c != null) {
+            bulk.find(jsonToDBObject(c)).update(jsonToDBObject(d));
+          }
+          break;
+        case "updateOne":
+          if (d != null) {
+            bulk.find(jsonToDBObject(c)).updateOne(jsonToDBObject(d));
+          }
+          break;
+        case "upsert" :
+          if (d != null) {
+            bulk.find(jsonToDBObject(c)).upsert().updateOne(jsonToDBObject(d));
+          }
+          break;
+        case "upsertOne":
+          if (d != null && c != null) {
+            bulk.find(jsonToDBObject(c)).upsert().updateOne(jsonToDBObject(d));
+          }
+          break;
+        case "remove":
+          if (c != null) {
+            bulk.find(jsonToDBObject(c)).remove();
+          }
+          break;
+        case "removeOne":
+          if (c != null) {
+            bulk.find(jsonToDBObject(c)).removeOne();
+          }
+          break;
+      }
+    }
+    final BulkWriteResult r;
+    if (writeConcern != null && !writeConcern.isEmpty()) {
+      r = bulk.execute(WriteConcern.valueOf(writeConcern));
+    } else {
+      r = bulk.execute();
+    }
+    sendOK(message, new JsonObject()
+                    .putNumber("inserted", r.getInsertedCount())
+                    .putNumber("matched", r.getMatchedCount())
+                    .putNumber("modified", r.getModifiedCount())
+                    .putNumber("removed", r.getRemovedCount())
+    );
   }
 
   private void doFind(Message<JsonObject> message) {
