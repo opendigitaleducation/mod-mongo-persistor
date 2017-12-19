@@ -19,8 +19,7 @@ package org.vertx.mods;
 import com.mongodb.DBObject;
 import com.mongodb.util.JSON;
 import com.mongodb.util.JSONSerializers;
-import org.vertx.java.core.json.JsonObject;
-import org.vertx.java.core.json.impl.Json;
+import io.vertx.core.json.JsonObject;
 
 import java.util.HashMap;
 
@@ -75,7 +74,7 @@ public class MongoUtil {
         String serialize = JSONSerializers.getStrict().serialize(dbObject);
 
         // Convert to JsonObject
-        HashMap<String, Object> jsonMap = Json.decodeValue(serialize, HashMap.class);
-        return new JsonObject(jsonMap);
+        //HashMap<String, Object> jsonMap = Json.decodeValue(serialize, HashMap.class);
+        return new JsonObject(serialize);
     }
 }
