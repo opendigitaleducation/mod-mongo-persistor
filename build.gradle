@@ -56,7 +56,7 @@ jar {
 
 shadowJar {
   classifier = 'fat'
-    archiveName = "org.entcore~${project.name}~$version-$classifier.$extension"
+    archiveName = "io.vertx~${project.name}~$version-$classifier.$extension"
     mergeServiceFiles {
       include 'META-INF/services/io.vertx.core.spi.VerticleFactory'
     }
