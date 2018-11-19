@@ -29,6 +29,7 @@ import javax.net.ssl.SSLSocketFactory;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -715,8 +716,12 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
 
     DBObject commandObject = MongoUtil.convertJsonToBson(command);
     CommandResult result = db.command(commandObject);
-
-    reply.put("result", new JsonObject(result.toMap()));
+    Map<String,Object> resultMap = result.toMap();
+    //BSONTimestamp cannot be serialized => only for replica set
+    resultMap.remove("operationTime");
+    resultMap.remove("$clusterTime");
+    //
+    reply.put("result", new JsonObject(resultMap));
     sendOK(message, reply);
   }
 
