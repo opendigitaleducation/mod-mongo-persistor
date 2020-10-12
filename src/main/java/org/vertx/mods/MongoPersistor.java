@@ -46,6 +46,7 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
   protected String host;
   protected int port;
   protected String dbName;
+  protected String dbAuth;
   protected String username;
   protected String password;
   protected ReadPreference readPreference;
@@ -66,6 +67,7 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     host = getOptionalStringConfig("host", "localhost");
     port = getOptionalIntConfig("port", 27017);
     dbName = getOptionalStringConfig("db_name", "default_db");
+    dbAuth = getOptionalStringConfig("db_auth", "default_db");
     username = getOptionalStringConfig("username", null);
     password = getOptionalStringConfig("password", null);
     readPreference = ReadPreference.valueOf(getOptionalStringConfig("read_preference", "primary"));
@@ -88,18 +90,20 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
         builder.socketFactory(SSLSocketFactory.getDefault());
       }
 
+      final List<MongoCredential> credentials = new ArrayList<>();
+      if (username != null && password != null && dbAuth != null) {
+        credentials.add(MongoCredential.createScramSha1Credential(username, dbAuth, password.toCharArray()));
+      }
+
       if (seedsProperty == null) {
         ServerAddress address = new ServerAddress(host, port);
-        mongo = new MongoClient(address, builder.build());
+        mongo = new MongoClient(address, credentials, builder.build());
       } else {
         List<ServerAddress> seeds = makeSeeds(seedsProperty);
-        mongo = new MongoClient(seeds, builder.build());
+        mongo = new MongoClient(seeds, credentials, builder.build());
       }
 
       db = mongo.getDB(dbName);
-      if (username != null && password != null) {
-        db.authenticate(username, password.toCharArray());
-      }
     } catch (UnknownHostException e) {
       logger.error("Failed to connect to mongo server", e);
     }
