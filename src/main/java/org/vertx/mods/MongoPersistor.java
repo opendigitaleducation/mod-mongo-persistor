@@ -724,6 +724,8 @@ public class MongoPersistor extends BusModBase implements Handler<Message<JsonOb
     //BSONTimestamp cannot be serialized => only for replica set
     resultMap.remove("operationTime");
     resultMap.remove("$clusterTime");
+    resultMap.remove("opTime");
+    resultMap.remove("electionId");
     //
     reply.put("result", new JsonObject(resultMap));
     sendOK(message, reply);
